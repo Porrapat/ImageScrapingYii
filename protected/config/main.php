@@ -36,6 +36,9 @@ return array(
 			// enable cookie-based authentication
 			'allowAutoLogin'=>true,
 		),
+		'curl'=>array(
+			'class'=> 'ext.Curl'
+		),
 		// uncomment the following to enable URLs in path-format
 		/*
 		'urlManager'=>array(
