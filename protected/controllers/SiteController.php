@@ -29,81 +29,53 @@ class SiteController extends Controller
 	{
 		// renders the view file 'protected/views/site/index.php'
 		// using the default layout 'protected/views/layouts/main.php'
-		$this->render('index');
-	}
-
-	/**
-	 * This is the action to handle external exceptions.
-	 */
-	public function actionError()
-	{
-		if($error=Yii::app()->errorHandler->error)
+		
+		$image_name_list = array();
+		$form_model=new InputUrlForm;
+		if(isset($_POST['InputUrlForm']))
 		{
-			if(Yii::app()->request->isAjaxRequest)
-				echo $error['message'];
-			else
-				$this->render('error', $error);
-		}
-	}
-
-	/**
-	 * Displays the contact page
-	 */
-	public function actionContact()
-	{
-		$model=new ContactForm;
-		if(isset($_POST['ContactForm']))
-		{
-			$model->attributes=$_POST['ContactForm'];
-			if($model->validate())
+			$url = $_POST['InputUrlForm']['url'];
+			$output = Yii::app()->curl->get($url);
+			
+			$packtPageXpath = ScrapingUtility::returnXPathObject($output);	// Instantiating new XPath DOM object
+			$coverImage = $packtPageXpath->query('//img/@src');	// Querying for book cover image URL
+			
+			// If cover image exists
+			if ($coverImage->length > 0) 
 			{
-				$name='=?UTF-8?B?'.base64_encode($model->name).'?=';
-				$subject='=?UTF-8?B?'.base64_encode($model->subject).'?=';
-				$headers="From: $name <{$model->email}>\r\n".
-					"Reply-To: {$model->email}\r\n".
-					"MIME-Version: 1.0\r\n".
-					"Content-Type: text/plain; charset=UTF-8";
+				ScrapingUtility::deleteAllFile('download/*');
+				
+				for($i=0 ; $i < $coverImage->length; $i++)
+				{
+					$imageUrl = $coverImage->item($i)->nodeValue;	// Add URL to variable
 
-				mail(Yii::app()->params['adminEmail'],$subject,$model->body,$headers);
-				Yii::app()->user->setFlash('contact','Thank you for contacting us. We will respond to you as soon as possible.');
-				$this->refresh();
+					$content_type = Yii::app()->curl->get_content_type($imageUrl);
+
+					$extension = ScrapingUtility::returnFileExtension($content_type);
+					
+					$imageUrl = str_replace("https://", "http://", $imageUrl);
+					if(ScrapingUtility::isFile($imageUrl))
+					{
+						if (getimagesize($imageUrl)) {
+							$imageFile = Yii::app()->curl->get($imageUrl);	// Download image using cURL
+							
+							$image_file_name = $i.".".$extension;
+							
+							$file = fopen("download/".$image_file_name, 'w');	// Opening file handle
+							fwrite($file, $imageFile);	// Writing image file
+							fclose($file);	// Closing file handle
+							
+							$image_name_list[] = $image_file_name;
+						}
+					}
+				}
 			}
 		}
-		$this->render('contact',array('model'=>$model));
-	}
-
-	/**
-	 * Displays the login page
-	 */
-	public function actionLogin()
-	{
-		$model=new LoginForm;
-
-		// if it is ajax validation request
-		if(isset($_POST['ajax']) && $_POST['ajax']==='login-form')
+		
+		if(isset($url))
 		{
-			echo CActiveForm::validate($model);
-			Yii::app()->end();
+			$form_model->url = $url;
 		}
-
-		// collect user input data
-		if(isset($_POST['LoginForm']))
-		{
-			$model->attributes=$_POST['LoginForm'];
-			// validate user input and redirect to the previous page if valid
-			if($model->validate() && $model->login())
-				$this->redirect(Yii::app()->user->returnUrl);
-		}
-		// display the login form
-		$this->render('login',array('model'=>$model));
-	}
-
-	/**
-	 * Logs out the current user and redirect to homepage.
-	 */
-	public function actionLogout()
-	{
-		Yii::app()->user->logout();
-		$this->redirect(Yii::app()->homeUrl);
+		$this->render('index',array('image_name_list'=>$image_name_list,'model'=>$form_model));
 	}
 }

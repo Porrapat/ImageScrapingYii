@@ -93,6 +93,16 @@ class Curl
 
         return $parsed['scheme'].'://'.$parsed['host'].$parsed['port'].$parsed['path'].$parsed['query'];
     }
+	
+	public function get_content_type($url)
+	{
+		$ch = curl_init($url);
+		$options = $this->getOptions();
+        curl_setopt_array($ch, $options);
+		curl_exec ($ch);
+		$contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+   		return $contentType;
+	}
 
     public function exec($url, $options, $debug = false)
     {
