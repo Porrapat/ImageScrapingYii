@@ -1,0 +1,6 @@
+download/*
+!download/.gitignore
+assets/*
+!assets/.gitignore
+protected/runtime/application.log
+
